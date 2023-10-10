@@ -1,4 +1,4 @@
-package simple.cafekiosk.spring.api.controller;
+package simple.cafekiosk.spring.api.controller.product;
 
 
 import lombok.RequiredArgsConstructor;
