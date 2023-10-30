@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import simple.cafekiosk.spring.api.controller.product.dto.request.ProductCreateRequest;
+import simple.cafekiosk.spring.api.service.product.request.ProductCreateServiceRequest;
 import simple.cafekiosk.spring.domain.product.Product;
 import simple.cafekiosk.spring.domain.product.ProductRepository;
 import simple.cafekiosk.spring.domain.product.ProductSellingStatus;
@@ -36,7 +37,7 @@ class ProductServiceTest {
         // given
         Product product = createProduct("001", HANDMADE, SELLING, "아메리카노", 4000);
         productRepository.save(product);
-        ProductCreateRequest request = ProductCreateRequest.builder()
+        ProductCreateServiceRequest request = ProductCreateServiceRequest.builder()
                 .type(HANDMADE)
                 .sellingStatus(SELLING)
                 .name("카푸치노")
@@ -60,7 +61,7 @@ class ProductServiceTest {
     @Test
     void createProductWhenProductIsEmpty() {
         // given
-        ProductCreateRequest request = ProductCreateRequest.builder()
+        ProductCreateServiceRequest request = ProductCreateServiceRequest.builder()
                 .type(HANDMADE)
                 .sellingStatus(SELLING)
                 .name("카푸치노")

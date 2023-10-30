@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import simple.cafekiosk.spring.api.controller.product.dto.request.ProductCreateRequest;
+import simple.cafekiosk.spring.api.service.product.request.ProductCreateServiceRequest;
 import simple.cafekiosk.spring.api.service.product.response.ProductResponse;
 import simple.cafekiosk.spring.domain.product.Product;
 import simple.cafekiosk.spring.domain.product.ProductRepository;
@@ -30,7 +31,7 @@ public class ProductService {
 
 
     @Transactional
-    public ProductResponse createProduct(ProductCreateRequest request) {
+    public ProductResponse createProduct(ProductCreateServiceRequest request) {
         String latestProductNumber = createNextProductNumber();
 
         Product product = request.toEntity(latestProductNumber);

@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import simple.cafekiosk.spring.api.controller.order.request.OrderCreateRequest;
+import simple.cafekiosk.spring.api.service.order.request.OrderCreateServiceRequest;
 import simple.cafekiosk.spring.api.service.order.response.OrderResponse;
 import simple.cafekiosk.spring.domain.order.OrderRepository;
 import simple.cafekiosk.spring.domain.orderProduct.OrderProductRepository;
@@ -16,7 +16,6 @@ import simple.cafekiosk.spring.domain.product.ProductType;
 import simple.cafekiosk.spring.domain.stock.Stock;
 import simple.cafekiosk.spring.domain.stock.StockRepository;
 
-import javax.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -59,7 +58,7 @@ class OrderServiceTest {
         Product product3 = createProduct(HANDMADE, "003", 5000);
         productRepository.saveAll(List.of(product1, product2, product3));
 
-        OrderCreateRequest request = OrderCreateRequest.builder()
+        OrderCreateServiceRequest request = OrderCreateServiceRequest.builder()
                 .productNumbers(List.of("001", "002"))
                 .build();
 
@@ -89,7 +88,7 @@ class OrderServiceTest {
         Product product3 = createProduct(HANDMADE, "003", 5000);
         productRepository.saveAll(List.of(product1, product2, product3));
 
-        OrderCreateRequest request = OrderCreateRequest.builder()
+        OrderCreateServiceRequest request = OrderCreateServiceRequest.builder()
                 .productNumbers(List.of("001", "001"))
                 .build();
 
@@ -124,7 +123,7 @@ class OrderServiceTest {
         Stock stock2 = Stock.create("002", 2);
         stockRepository.saveAll(List.of(stock1, stock2));
 
-        OrderCreateRequest request = OrderCreateRequest.builder()
+        OrderCreateServiceRequest request = OrderCreateServiceRequest.builder()
                 .productNumbers(List.of("001", "001", "002", "003"))
                 .build();
 
@@ -168,7 +167,7 @@ class OrderServiceTest {
         Stock stock2 = Stock.create("002", 1);
         stockRepository.saveAll(List.of(stock1, stock2));
 
-        OrderCreateRequest request = OrderCreateRequest.builder()
+        OrderCreateServiceRequest request = OrderCreateServiceRequest.builder()
                 .productNumbers(List.of("001", "001", "002", "003"))
                 .build();
 
