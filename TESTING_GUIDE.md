@@ -1,46 +1,352 @@
 # Practical Testing 저장소 빠른 레퍼런스
 
-실무에서 테스트를 작성하다가 “이런 경우 어떻게 검증했더라?” 하고 떠올릴 수 있도록, 저장소에 이미 작성된 테스트를 상황별로 묶어서 정리했습니다. 각 항목은 **언제(상황)**, **어떤 테스트 타입을 선택했는지**, **검증 포인트/패턴**을 중심으로 설명합니다.
+실무에서 테스트를 작성할 때 "이럴 때 어떻게 검증했더라?" 하고 떠올릴 수 있도록, 저장소의 대표 테스트를 상황별로 요약했습니다. 각 항목은 **언제 이 패턴을 고르는지**, **테스트 구성**과 **핵심 검증 코드**를 함께 제공합니다.
 
-## 1. 한눈에 보는 테스트 맵
-| 상황 | 사용한 테스트 | 핵심 포인트 | 참고 테스트 |
+## 1. 한눈에 보는 테스트 시나리오 맵
+| 상황 | 선택한 테스트 | 핵심 포인트 | 대표 코드 |
 | --- | --- | --- | --- |
-| 주문 도메인 합계·상태 계산 | 순수 JUnit 단위 테스트 | `Order.create` 결과 필드 단언 | `OrderTest`【F:src/test/java/simple/cafekiosk/spring/domain/order/OrderTest.java†L16-L65】 |
-| 재고 차감 로직 | 순수 JUnit + `@TestFactory` | 성공/실패 시나리오 동적 테스트 | `StockTest`【F:src/test/java/simple/cafekiosk/spring/domain/stock/StockTest.java†L16-L78】 |
-| 판매 상품/상품번호 조회 | `@SpringBootTest` 리포지토리 통합 | 슬라이스 대신 실제 빈 로딩, `tuple` 검증 | `ProductRepositoryTest`【F:src/test/java/simple/cafekiosk/spring/domain/product/ProductRepositoryTest.java†L17-L88】 |
-| 상품 재고 조회 | `@DataJpaTest` 슬라이스 | `findAllBy...In` 쿼리 결과 추출 비교 | `StockRepositoryTest`【F:src/test/java/simple/cafekiosk/spring/domain/stock/StockRepositoryTest.java†L13-L38】 |
-| 주문 생성 서비스 | `@SpringBootTest` + 실 DB | 재고 차감/예외, 중복 상품 케이스 | `OrderServiceTest`【F:src/test/java/simple/cafekiosk/spring/api/service/order/OrderServiceTest.java†L35-L161】 |
-| 상품 등록 서비스 | `@SpringBootTest` + `@Transactional` | 신규 상품번호 할당, 빈 저장소 케이스 | `ProductServiceTest`【F:src/test/java/simple/cafekiosk/spring/api/service/product/ProductServiceTest.java†L23-L94】 |
-| 메일 발송 협력 객체 | Mockito 단위 테스트 | `@Spy` + `doReturn`, `verify`로 부수효과 확인 | `MailServiceTest`【F:src/test/java/simple/cafekiosk/spring/api/service/mail/MailServiceTest.java†L19-L65】 |
-| 매출 통계 집계 | `@SpringBootTest` + `@MockBean` | 기간 필터링, 저장 이력 검증 | `OrderStatisticsServiceTest`【F:src/test/java/simple/cafekiosk/spring/api/service/order/OrderStatisticsServiceTest.java†L24-L116】 |
-| 제품/주문 API 검증 | `@WebMvcTest` | JSON 요청/응답, 필드별 검증 | `ProductControllerTest`, `OrderControllerTest`【F:src/test/java/simple/cafekiosk/spring/api/controller/product/ProductControllerTest.java†L26-L142】【F:src/test/java/simple/cafekiosk/spring/api/controller/order/OrderControllerTest.java†L23-L74】 |
-| enum 분기 검증 | JUnit 파라미터화 테스트 | `@CsvSource`, `@MethodSource` | `ProductTypeTest`【F:src/test/java/simple/cafekiosk/spring/domain/product/ProductTypeTest.java†L16-L70】 |
+| 주문 도메인 합계·상태 계산 | 순수 JUnit 단위 테스트 | 빌더로 픽스처 구성 후 값 단언 | [Order 도메인 단위 테스트](#order-도메인-단위-테스트) |
+| 재고 차감 로직 | 순수 JUnit + `@TestFactory` | 성공/실패 케이스를 동적 테스트로 묶기 | [Stock 동적 테스트](#stock-동적-테스트) |
+| enum 분기 검증 | JUnit 파라미터화 테스트 | `@CsvSource`, `@MethodSource`로 다양한 입력 확인 | [ProductType 파라미터화 테스트](#producttype-파라미터화-테스트) |
+| 상품 재고 조회 | `@DataJpaTest` | 슬라이스 구성 + `tuple` 단언 | [재고 리포지토리 슬라이스 테스트](#재고-리포지토리-슬라이스-테스트) |
+| 판매 상품/상품번호 조회 | `@SpringBootTest` + `@Transactional` | 실제 빈 주입, 여러 쿼리 검증 | [상품 리포지토리 통합 테스트](#상품-리포지토리-통합-테스트) |
+| 주문 생성 서비스 | `@SpringBootTest` | 재고 차감, 예외 흐름까지 한 번에 검증 | [주문 서비스 통합 테스트](#주문-서비스-통합-테스트) |
+| 상품 등록 서비스 | `@SpringBootTest` | 상품번호 증가/빈 저장소 케이스 | [상품 서비스 통합 테스트](#상품-서비스-통합-테스트) |
+| 메일 발송 협력 객체 | Mockito 단위 테스트 | `@Spy` + `doReturn`, `verify` 조합 | [메일 서비스 단위 테스트](#메일-서비스-단위-테스트) |
+| 매출 통계 집계 | `@SpringBootTest` + `@MockBean` | 기간 필터 + 외부 의존성 대체 | [주문 통계 배치 테스트](#주문-통계-배치-테스트) |
+| 제품/주문 API 검증 | `@WebMvcTest` | `MockMvc` 요청/응답, JSON 필드 단언 | [웹 계층 테스트](#웹-계층-테스트) |
 
-## 2. 도메인 로직 테스트 방법
-- **주문 합계/상태 확인**: 빌더로 만든 `Product` 리스트를 `Order.create`에 전달한 뒤 총 금액·상태·등록 시간을 AssertJ로 검증합니다.【F:src/test/java/simple/cafekiosk/spring/domain/order/OrderTest.java†L18-L63】
-- **재고 차감 시나리오**: `Stock.create`로 기본 상태를 만들고, 성공/실패 케이스를 각각 `@Test`로, 여러 조건을 묶을 땐 `@TestFactory`로 동적 테스트를 구성합니다.【F:src/test/java/simple/cafekiosk/spring/domain/stock/StockTest.java†L18-L78】
-- **enum 분기**: 동일 로직을 다양한 입력으로 확인해야 할 땐 `@CsvSource`, `@MethodSource`와 같은 파라미터화 도구를 활용합니다.【F:src/test/java/simple/cafekiosk/spring/domain/product/ProductTypeTest.java†L33-L67】
+## 2. Order 도메인 단위 테스트
+- **언제 사용?** 순수 도메인 객체의 계산/상태 변화를 외부 의존성 없이 검증할 때.
+- **구성 팁**: 빌더로 읽기 쉬운 픽스처를 만들고, `Order.create` 호출 결과를 AssertJ로 단언합니다.
 
-## 3. 데이터 접근 계층(JPA)
-- **재고 조회만 필요한 경우** `@DataJpaTest`를 사용하여 슬라이스로 빠르게 검증하고, `extracting` + `tuple` 로 복합 필드를 비교합니다.【F:src/test/java/simple/cafekiosk/spring/domain/stock/StockRepositoryTest.java†L13-L38】
-- **다양한 쿼리 동작/트랜잭션이 필요한 경우** `@SpringBootTest`와 `@Transactional`을 조합해 실제 빈을 사용합니다. 판매 상태 필터, 상품번호 리스트 조회, 최근 상품번호 조회 등의 시나리오를 각각 독립 테스트로 분리합니다.【F:src/test/java/simple/cafekiosk/spring/domain/product/ProductRepositoryTest.java†L17-L88】
+```java
+@DisplayName("주문 생성 시 상품 리스트에서 주문의 총 금액을 계산한다.")
+@Test
+void calculateTotalPrice() {
+    // given
+    List<Product> products = List.of(
+            createProduct("001", 1000),
+            createProduct("002", 2000)
+    );
 
-## 4. 서비스 레이어 통합 시나리오
-- **주문 생성 플로우**: `OrderServiceTest`는 등록 요청을 만들고, 중복 상품, 재고 차감, 재고 부족 예외까지 순차적으로 커버합니다. 테스트 후 `@AfterEach`에서 `deleteAllInBatch`로 테이블을 정리합니다.【F:src/test/java/simple/cafekiosk/spring/api/service/order/OrderServiceTest.java†L35-L161】
-- **상품 등록 규칙**: 최신 상품번호를 기준으로 증가시키는 로직과, 상품이 없을 때의 기본값(`001`)을 각각 케이스로 나눠 검증합니다.【F:src/test/java/simple/cafekiosk/spring/api/service/product/ProductServiceTest.java†L35-L90】
+    // when
+    Order order = Order.create(products, LocalDateTime.now());
 
-## 5. 외부 협력 & 배치성 로직
-- **메일 전송과 기록**: Mockito 확장을 적용하고, 실제 구현을 절반만 쓰고 싶은 경우 `@Spy`와 `doReturn`으로 일부 동작을 스텁 합니다. 이후 `verify`로 저장소 호출 횟수를 검증합니다.【F:src/test/java/simple/cafekiosk/spring/api/service/mail/MailServiceTest.java†L19-L65】
-- **매출 통계 집계**: 통합 테스트로 주문과 상품을 저장한 뒤, 통계 대상 기간을 걸러내고 `@MockBean`으로 외부 메일 발송을 대체합니다. 실행 후 `MailSendHistory` 저장 여부와 메시지를 확인합니다.【F:src/test/java/simple/cafekiosk/spring/api/service/order/OrderStatisticsServiceTest.java†L24-L116】
+    // then
+    assertThat(order.getTotalPrice()).isEqualTo(3000);
+}
+```
 
-## 6. 웹 계층 테스트 패턴
-- **`@WebMvcTest` 구성**: `MockMvc`/`ObjectMapper`를 주입받고, 서비스는 `@MockBean`으로 대체합니다.【F:src/test/java/simple/cafekiosk/spring/api/controller/product/ProductControllerTest.java†L26-L40】
-- **요청 검증**: 필수 필드 누락, 값 범위 오류 등을 JSON 응답의 `code`, `message`, `data` 필드까지 세밀하게 단언합니다.【F:src/test/java/simple/cafekiosk/spring/api/controller/product/ProductControllerTest.java†L64-L140】
-- **정상 플로우 확인**: 주문 API는 성공 응답 코드·메시지를 중심으로 검증하고, 유효성 실패 시 적절한 에러 메시지를 검사합니다.【F:src/test/java/simple/cafekiosk/spring/api/controller/order/OrderControllerTest.java†L41-L72】
+## 3. Stock 동적 테스트
+- **언제 사용?** 동일한 준비 상태에서 성공/실패 흐름을 한 번에 검증하고 싶을 때.
+- **구성 팁**: 정적 테스트로 기본 동작을 확인한 뒤, `@TestFactory`로 다양한 시나리오를 `DynamicTest` 목록에 담습니다.
 
-## 7. 테스트 픽스처 관리 팁
-- 각 테스트 클래스는 `Product.builder()` 등 빌더 메서드를 활용해 읽기 쉬운 픽스처를 구성합니다.【F:src/test/java/simple/cafekiosk/spring/api/service/order/OrderServiceTest.java†L118-L161】
-- 반복되는 픽스처는 private 헬퍼 메서드로 추출하여 다른 테스트에서도 재사용합니다.【F:src/test/java/simple/cafekiosk/spring/api/service/product/ProductServiceTest.java†L70-L92】
-- 통합 테스트에서는 `@AfterEach` 혹은 `deleteAllInBatch`로 데이터 정리를 습관화하여 테스트 간 간섭을 방지합니다.【F:src/test/java/simple/cafekiosk/spring/api/service/order/OrderServiceTest.java†L44-L50】
+```java
+@DisplayName("재고 차감 시나리오")
+@TestFactory
+Collection<DynamicTest> stockDeductionDynamicTest() {
+    // given
+    Stock stock = Stock.create("001", 1);
 
-필요한 상황을 위 표에서 찾은 뒤, 해당 테스트 파일의 구현을 바로 열어보면 유사한 실무 시나리오를 빠르게 재현할 수 있습니다.
+    return List.of(
+            DynamicTest.dynamicTest("재고를 주어진 개수만큼 차감할 수 있다.", () -> {
+                int quantity = 1;
+                stock.deductQuantity(quantity);
+                assertThat(stock.getQuantity()).isZero();
+            }),
+            DynamicTest.dynamicTest("재고보다 많은 수의 수량으로 차감 시도하는 경우 예외가 발생한다.", () -> {
+                int quantity = 1;
+                assertThatThrownBy(() -> stock.deductQuantity(quantity))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessage("차감할 재고 수량이 없습니다.");
+            })
+    );
+}
+```
+
+## 4. ProductType 파라미터화 테스트
+- **언제 사용?** 입력값이 여러 개지만 로직은 동일한 enum 분기/유틸 메서드를 검증할 때.
+- **구성 팁**: `@CsvSource` 나 `@MethodSource` 를 사용하면 한 메서드에서 다양한 케이스를 커버할 수 있습니다.
+
+```java
+@DisplayName("상품 타입이 재고 관련 타입인지를 체크한다.")
+@CsvSource({"HANDMADE,false", "BOTTLE,true", "BAKERY,true"})
+@ParameterizedTest
+void containsStockType(ProductType productType, boolean expected) {
+    boolean result = ProductType.containsStockType(productType);
+    assertThat(result).isEqualTo(expected);
+}
+```
+
+## 5. 재고 리포지토리 슬라이스 테스트
+- **언제 사용?** 단일 리포지토리의 JPA 쿼리만 빠르게 검증하고 싶을 때.
+- **구성 팁**: `@DataJpaTest`로 슬라이스를 올리고, `tuple`을 활용해 복합 필드를 한 번에 비교합니다.
+
+```java
+@DataJpaTest
+class StockRepositoryTest {
+
+    @Autowired
+    private StockRepository stockRepository;
+
+    @DisplayName("상품번호 리스트로 재고를 조회한다.")
+    @Test
+    void findAllByProductNumberIn() {
+        stockRepository.saveAll(List.of(
+                Stock.create("001", 1),
+                Stock.create("002", 2),
+                Stock.create("003", 3)
+        ));
+
+        List<Stock> stocks = stockRepository.findAllByProductNumberIn(List.of("001", "002"));
+
+        assertThat(stocks).hasSize(2)
+                .extracting("productNumber", "quantity")
+                .containsExactlyInAnyOrder(
+                        tuple("001", 1),
+                        tuple("002", 2)
+                );
+    }
+}
+```
+
+## 6. 상품 리포지토리 통합 테스트
+- **언제 사용?** 여러 엔티티/트랜잭션 경계를 포함하는 실제 쿼리 동작을 확인해야 할 때.
+- **구성 팁**: `@SpringBootTest` + `@Transactional`로 스프링 컨텍스트를 전부 올리고, 필요한 시나리오를 테스트 메서드 단위로 분리합니다.
+
+```java
+@ActiveProfiles("test")
+@Transactional
+@SpringBootTest
+class ProductRepositoryTest {
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @DisplayName("원하는 판매상태를 가진 상품들을 조회한다.")
+    @Test
+    void findAllBySellingStatusIn() {
+        productRepository.saveAll(List.of(
+                createProduct("001", HANDMADE, SELLING, "아메리카노", 4000),
+                createProduct("002", HANDMADE, HOLD, "카페라떼", 4500),
+                createProduct("003", HANDMADE, STOP_SELLING, "팥빙수", 7000)
+        ));
+
+        List<Product> products = productRepository.findAllBySellingStatusIn(List.of(SELLING, HOLD));
+
+        assertThat(products).hasSize(2)
+                .extracting("productNumber", "name", "sellingStatus")
+                .containsExactlyInAnyOrder(
+                        tuple("001", "아메리카노", SELLING),
+                        tuple("002", "카페라떼", HOLD)
+                );
+    }
+}
+```
+
+## 7. 주문 서비스 통합 테스트
+- **언제 사용?** 서비스 계층에서 여러 리포지토리·도메인 객체가 협력하며 동작하는 흐름을 검증할 때.
+- **구성 팁**: 픽스처 저장 → 서비스 호출 → 응답/DB 상태를 모두 검증합니다. `@AfterEach` 로 데이터를 정리해 테스트 간 간섭을 없앱니다.
+
+```java
+@AfterEach
+void tearDown() {
+    orderProductRepository.deleteAllInBatch();
+    productRepository.deleteAllInBatch();
+    orderRepository.deleteAllInBatch();
+    stockRepository.deleteAllInBatch();
+}
+
+@DisplayName("재고가 부족한 상품으로 주문을 생성하려는 경우 예외가 발생한다.")
+@Test
+void createOrderWithNoStock() {
+    productRepository.saveAll(List.of(
+            createProduct(BOTTLE, "001", 1000),
+            createProduct(BAKERY, "002", 3000),
+            createProduct(HANDMADE, "003", 5000)
+    ));
+    stockRepository.saveAll(List.of(
+            Stock.create("001", 1),
+            Stock.create("002", 1)
+    ));
+
+    OrderCreateServiceRequest request = OrderCreateServiceRequest.builder()
+            .productNumbers(List.of("001", "001", "002", "003"))
+            .build();
+
+    LocalDateTime registeredDateTime = LocalDateTime.now();
+
+    assertThatThrownBy(() -> orderService.createOrder(request, registeredDateTime))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("재고가 부족한 상품이 있습니다.");
+}
+```
+
+## 8. 상품 서비스 통합 테스트
+- **언제 사용?** 서비스가 리포지토리를 조합해 새로운 비즈니스 규칙(상품번호 증가 등)을 수행할 때.
+- **구성 팁**: 저장소에 선행 데이터를 넣고, 서비스 호출 후 결과 리스트를 `extracting` 으로 비교합니다.
+
+```java
+@DisplayName("상품이 하나도 없는 경우 신규 상품을 등록하면 상품번호는 001 이다.")
+@Test
+void createProductWhenProductIsEmpty() {
+    ProductCreateServiceRequest request = ProductCreateServiceRequest.builder()
+            .type(HANDMADE)
+            .sellingStatus(SELLING)
+            .name("카푸치노")
+            .price(5000)
+            .build();
+
+    productService.createProduct(request);
+
+    List<Product> products = productRepository.findAll();
+    assertThat(products).hasSize(1)
+            .extracting("productNumber", "type", "sellingStatus", "name", "price")
+            .containsExactly(tuple("001", HANDMADE, SELLING, "카푸치노", 5000));
+}
+```
+
+## 9. 메일 서비스 단위 테스트
+- **언제 사용?** 외부 협력 객체(메일 전송 등)를 부분적으로 스텁하고, 부수 효과(저장 호출)를 검증해야 할 때.
+- **구성 팁**: `@ExtendWith(MockitoExtension.class)` 를 사용하고, 일부 동작만 대체하려면 `@Spy` + `doReturn` 을 활용합니다.
+
+```java
+@ExtendWith(MockitoExtension.class)
+class MailServiceTest {
+
+    @Spy
+    private MailSendClient mailSendClient;
+
+    @Mock
+    private MailSendHistoryRepository mailSendHistoryRepository;
+
+    @InjectMocks
+    private MailService mailService;
+
+    @DisplayName("메일 전송 테스트")
+    @Test
+    void sendMail() {
+        doReturn(true)
+                .when(mailSendClient)
+                .sendMail(anyString(), anyString(), anyString(), anyString());
+
+        boolean result = mailService.sendMail("", "", "", "");
+
+        assertThat(result).isTrue();
+        verify(mailSendHistoryRepository, times(1)).save(any(MailSendHistory.class));
+    }
+}
+```
+
+## 10. 주문 통계 배치 테스트
+- **언제 사용?** 배치성 로직에서 기간 필터링과 외부 호출(메일 발송 등)을 동시에 확인해야 할 때.
+- **구성 팁**: `@MockBean` 으로 외부 의존성을 대체하고, 결과 저장소에 기록된 이력을 검증합니다.
+
+```java
+@SpringBootTest
+class OrderStatisticsServiceTest {
+
+    @MockBean
+    private MailSendClient mailSendClient;
+
+    @DisplayName("결제완료 주문들을 조회하여 매출 통계 메일을 전송한다.")
+    @Test
+    void sendOrderStatisticsMail() {
+        when(mailSendClient.sendMail(any(), any(), any(), any())).thenReturn(true);
+
+        boolean result = orderStatisticsService.sendOrderStatisticsMail(
+                LocalDate.of(2023, 11, 6), "test@test.com"
+        );
+
+        assertThat(result).isTrue();
+        List<MailSendHistory> histories = mailSendHistoryRepository.findAll();
+        assertThat(histories).hasSize(1)
+                .extracting("content")
+                .contains("총 매출 합계는 12000원 입니다.");
+    }
+}
+```
+
+## 11. 웹 계층 테스트
+- **언제 사용?** 컨트롤러의 요청/응답 포맷과 검증 메시지를 확인하고 싶을 때.
+- **구성 팁**: `@WebMvcTest`로 컨트롤러만 올리고, 서비스는 `@MockBean`으로 교체합니다. `MockMvc`로 요청을 보내고 `jsonPath`로 응답을 검증합니다.
+
+```java
+@WebMvcTest(controllers = ProductController.class)
+class ProductControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockBean
+    private ProductService productService;
+
+    @DisplayName("신규 상품을 등록할 때 상품 타입은 필수값이다.")
+    @Test
+    void createProductWithoutType() throws Exception {
+        ProductCreateRequest request = ProductCreateRequest.builder()
+                .sellingStatus(ProductSellingStatus.SELLING)
+                .name("아메리카노")
+                .price(4000)
+                .build();
+
+        mockMvc.perform(
+                        post("/api/v1/products/new")
+                                .content(objectMapper.writeValueAsString(request))
+                                .contentType(MediaType.APPLICATION_JSON)
+                )
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("400"))
+                .andExpect(jsonPath("$.status").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("상품 타입은 필수입니다."))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+}
+```
+
+```java
+@WebMvcTest(controllers = OrderController.class)
+class OrderControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockBean
+    private OrderService orderService;
+
+    @DisplayName("신규 주문을 등록할 때 상품번호가 1개 이상이여야 한다.")
+    @Test
+    void createOrderWithEmptyProductNumbers() throws Exception {
+        OrderCreateRequest request = OrderCreateRequest.builder()
+                .productNumbers(List.of())
+                .build();
+
+        mockMvc.perform(
+                        post("/api/v1/orders/new")
+                                .content(objectMapper.writeValueAsString(request))
+                                .contentType(MediaType.APPLICATION_JSON)
+                )
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("400"))
+                .andExpect(jsonPath("$.status").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value("상품 번호 리스트는 필수입니다."))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+}
+```
+
+## 12. 테스트 픽스처 & 정리 습관
+- 빌더/정적 팩토리(`Product.builder()`, `Stock.create`)로 의도가 드러나는 픽스처를 작성합니다.
+- 반복되는 픽스처는 private 메서드(`createProduct` 등)로 추출해 다른 테스트에서도 재사용합니다.
+- 통합 테스트에서는 `@AfterEach` 혹은 `deleteAllInBatch()`를 활용해 데이터 간섭을 막습니다.
+
+필요한 상황을 위 표에서 찾아 해당 섹션의 코드와 설명을 참고하면, 실무 테스트 작성 시 빠르게 패턴을 적용할 수 있습니다.
